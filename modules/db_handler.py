@@ -31,3 +31,6 @@ class db_handler:
         
         if name != False :
             return self.db.movie.find({"$or": [{"name" : {"$regex" : ".*"+name+".*"}},{"name_chn" : {"$regex" : ".*"+name+".*"}}]})
+
+    def UpdateMovie(self, id, update):
+        return self.db.movie.update_one({"_id":id},update)
