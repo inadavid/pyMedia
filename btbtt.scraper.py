@@ -6,7 +6,7 @@ import json
 import os
 import sys
 import socket
-from datetime import date
+from datetime import datetime,date
 from bs4 import BeautifulSoup as bs
 from modules.db_handler import db_handler
 
@@ -139,12 +139,11 @@ while True:
                         if mode_debug == True:
                             print("IMDB:", movie["imdb"])
                         imdb_info = geturl("https://api.themoviedb.org/3/find/" +
-                                           movie["imdb"]+"?external_source=imdb_id&api_key="+tmdb_api)
+                                           movie["imdb"]+"?external_source=imdb_id&api_key="+tmdb_api).decode()
                         tmdb_rlt = json.loads(imdb_info)["movie_results"]
                         if len(tmdb_rlt) > 0:
                             movie["imdb_info"] = tmdb_rlt[0]
-                            movie["year"] = int(date.fromisoformat(
-                                movie["imdb_info"]["release_date"]).year)
+                            movie["year"] = int(movie["imdb_info"]["release_date"][:3])
                             movie["name"] = movie["imdb_info"]["title"]
                         else:
                             if list_page["filter"]["imdb"] == True:
