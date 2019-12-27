@@ -98,9 +98,13 @@ while True:
                 if(in_db_count > quit_scrap_num_in_db) :
                     print("found",quit_scrap_num_in_db,"times in db. skipping this url.")
                     break
-
-            movie["year"] = int(re.compile('[^0-9]').sub('', list_content.select(
+            try:
+                movie["year"] = int(re.compile('[^0-9]').sub('', list_content.select(
                 "a.subject_type")[0].text.replace("[", "").replace("]", "")[:4]))
+            except:
+                print("movie year parse failed.")
+                continue
+                
             if "filter" in list_page and "year" in list_page["filter"] and movie["year"] < list_page["filter"]["year"]:
                 if mode_debug == True:
                     print("filter year not match. skipping this movie.")
@@ -143,7 +147,7 @@ while True:
                         tmdb_rlt = json.loads(imdb_info)["movie_results"]
                         if len(tmdb_rlt) > 0:
                             movie["imdb_info"] = tmdb_rlt[0]
-                            movie["year"] = int(movie["imdb_info"]["release_date"][:3])
+                            movie["year"] = int(movie["imdb_info"]["release_date"][:4])
                             movie["name"] = movie["imdb_info"]["title"]
                         else:
                             if list_page["filter"]["imdb"] == True:
