@@ -4,7 +4,7 @@ import difflib
 import os, stat, sys
 from modules.db_handler import db_handler
 from datetime import datetime
-from config import tdir,fdir,idir,ndif,dburl
+from config import tdir,fdir,idir,ndir,dburl
 
 db = db_handler(dburl)
 sleep_time = 60
