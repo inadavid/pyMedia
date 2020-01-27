@@ -9,42 +9,22 @@ import socket
 from datetime import datetime,date
 from bs4 import BeautifulSoup as bs
 from modules.db_handler import db_handler
+from config import list_pages, dburl
 
 # define static vars
 sleep_time = 3600*4
 socket_timout = 10  # wait for 10 seconds before saying http timeout.
 quit_scrap_num_in_db = 5
 mode_debug = True
-list_pages = [{
-    "url": "forum-index-fid-1-typeid1-1-typeid2-0-typeid3-0-typeid4-0.htm",
-    "filter": {
-        "year": 0,
-        "imdb": True
-    },
-    "name": "US/UK",
-},
-    {
-    "url": "forum-index-fid-1-typeid1-9-typeid2-0-typeid3-0-typeid4-0.htm",
-    "filter": {
-        "year": 2000,
-        "imdb": True
-    },
-    "name": "CN ML",
-},
-    {
-    "url": "forum-index-fid-1-typeid1-3-typeid2-0-typeid3-0-typeid4-0.htm",
-    "filter": {
-        "year": 2000,
-        "imdb": True
-    },
-    "name": "CN HK",
-}]
+
 tmdb_api = "c746414134916b74f0666bd9f7704b44"
-db = db_handler("192.168.7.201")
+db = db_handler(dburl)
 user_agent = 'Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)'
 
 
-def geturl(url):
+def geturl(url, retry=5):
+    if retry==0:
+        return False
     socket.setdefaulttimeout(socket_timout)
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -56,7 +36,7 @@ def geturl(url):
         return content
     except:
         print("open and read error of url:", url, ". try again.")
-        return geturl(url)
+        return geturl(url,retry-1)
 
 
 # do a look to search
@@ -142,18 +122,17 @@ while True:
                         movie["imdb"] = imdb.group(0)
                         if mode_debug == True:
                             print("IMDB:", movie["imdb"])
-                        imdb_info = geturl("https://api.themoviedb.org/3/find/" +
-                                           movie["imdb"]+"?external_source=imdb_id&api_key="+tmdb_api).decode()
-                        tmdb_rlt = json.loads(imdb_info)["movie_results"]
-                        if len(tmdb_rlt) > 0:
-                            movie["imdb_info"] = tmdb_rlt[0]
-                            movie["year"] = int(movie["imdb_info"]["release_date"][:4])
-                            movie["name"] = movie["imdb_info"]["title"]
-                        else:
+                        imdb_info = geturl("https://api.themoviedb.org/3/movie/" +
+                                           movie["imdb"]+"?language=en-US&api_key="+tmdb_api)
+                        if imdb_info == False:
+                            outflag = True
+                            continue
+
+                        tmdb_rlt = json.loads(imdb_info.decode())
+                        if "status_code" in tmdb_rlt and tmdb_rlt["status_code"]==34:
                             if list_page["filter"]["imdb"] == True:
                                 if mode_debug == True:
-                                    print(
-                                        "No IMDB info from tmdb website for this movie, skipping")
+                                    print("No IMDB info from tmdb website for this movie, skipping")
                                 outflag = True
                                 continue
                             movie["imdb_info"] = {}
@@ -161,6 +140,35 @@ while True:
                             movie["name"] = movie["name_chn"]
                             if movie["year"] < 1900:
                                 movie["year"] += 1900
+                        else:
+                            if "genres" in list_page["filter"] :
+                                if list_page["filter"]["genres"]["type"]=="skip":
+                                    skipflag=False
+                                    for skip in list_page["filter"]["genres"]["list"]:
+                                        for genre in tmdb_rlt["genres"]: 
+                                            if skip == genre["id"]:
+                                                skipflag=True
+                                                break
+                                        if skipflag==True: break
+                                    if skipflag==True: 
+                                        outflag = True
+                                        continue
+                                elif list_page["filter"]["genres"]["type"]=="contain":
+                                    skipflag=True
+                                    for contain in list_page["filter"]["genres"]["list"]:
+                                        for genre in tmdb_rlt["genres"]: 
+                                            if contain == genre["id"]:
+                                                skipflag=False
+                                                break
+                                        if skipflag==False: break
+                                    if skipflag==True: 
+                                        outflag = True
+                                        continue
+
+                            movie["imdb_info"] = tmdb_rlt
+                            movie["year"] = int(movie["imdb_info"]["release_date"][:4])
+                            movie["name"] = movie["imdb_info"]["title"]
+                            
             if outflag == True:
                 continue
 

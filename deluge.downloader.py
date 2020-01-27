@@ -4,13 +4,11 @@ import difflib
 import os, stat, sys
 from modules.db_handler import db_handler
 from datetime import datetime
+from config import tdir,fdir,idir,ndif,dburl
 
-db = db_handler("192.168.7.201")
+db = db_handler(dburl)
 sleep_time = 60
-tdir = "/mnt/download/torrents/" # dir for torrent
-fdir = "/mnt/data/TempDownload/" # dir for downloaded files
-idir = "/mnt/download/incomplete/" # dir
-ndir = "/mnt/data/share/public/Entertain/Movies/MonthlyCategory/"
+
 
 #downstat status:
 #0, scraped
@@ -21,6 +19,16 @@ ndir = "/mnt/data/share/public/Entertain/Movies/MonthlyCategory/"
 
 
 while True:
+    #move all files in forlder level to first level and rename them.
+    f = []
+    for (dirpath, dirnames, filenames) in os.walk(fdir):
+        if fdir == dirpath: continue
+        if len(filenames)!=1: continue
+        ext = filenames[0][filenames[0].rfind("."):]
+        os.rename(dirpath+"/"+filenames[0], dirpath + ext)
+        os.rmdir(dirpath)
+    print("move files inside folder to parent level.")
+
     for task in db.FindMovie(downstat=0):
         if task["platform"] == "btbtt.com":
             fn = tdir+task["torrent"]["name"]
@@ -45,13 +53,16 @@ while True:
         fn = task["torrent"]["name"][:task["torrent"]["name"].rfind(".")]
         for r, d, f in os.walk(idir):
             for item in f:
-                ratio = difflib.SequenceMatcher(None, fn, item).quick_ratio()
-                if ratio > 0.9: 
-                    print(task["torrent"]["name"],"is being downloaded.")
-                    db.UpdateMovie(task["_id"],{"$set":{"downstat":3,"datelog.downloading":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"torrent.real_fn":item}})
+                try:
+                    ratio = difflib.SequenceMatcher(None, fn, item).quick_ratio()
+                    if ratio > 0.9: 
+                        print(task["torrent"]["name"],"is being downloaded.")
+                        db.UpdateMovie(task["_id"],{"$set":{"downstat":3,"datelog.downloading":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"torrent.real_fn":item}})
+                except:
+                    continue
 
     print("check downloading files done. check downloaded files")
-    for task in db.FindMovie(downstat=3):
+    for task in db.FindMovie(downstat={ "$in": [2, 3] } ):
         fn = task["torrent"]["name"][:task["torrent"]["name"].rfind(".")]
         for r, d, f in os.walk(fdir):
             for item in f:
@@ -66,7 +77,10 @@ while True:
 
                     folder_name = datetime.now().strftime("%Y%m")+"/"+folder_name
                     if not os.path.exists(ndir+folder_name): os.makedirs(ndir+folder_name)
-                    os.rename(fdir+fn, ndir+folder_name+"/"+file_name)
+                    try:
+                        os.rename(fdir+fn, ndir+folder_name+"/"+file_name)
+                    except:
+                        continue
                     os.chmod(ndir+folder_name, stat.S_IRWXO)
                     print("file moved to target folder.")
                     db.UpdateMovie(task["_id"],{"$set":{"downstat":4,"datelog.downloaded":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"torrent.real_fn":item}})
