@@ -64,10 +64,13 @@ while True:
     print("check downloading files done. check downloaded files")
     for task in db.FindMovie(downstat={ "$in": [2, 3] } ):
         fn = task["torrent"]["name"][:task["torrent"]["name"].rfind(".")]
+        fn2 = task["torrent"]["name"][:task["torrent"]["name"].find(".")]
         for r, d, f in os.walk(fdir):
             for item in f:
                 ratio = difflib.SequenceMatcher(None, fn, item).quick_ratio()
-                if ratio > 0.9: 
+                ratio2 = difflib.SequenceMatcher(None, fn2, item[:item.rfind(".")]).quick_ratio()
+                #print(fn,fn2,item,ratio,ratio2)
+                if ratio > 0.9 or ratio2 > 0.9: 
                     print(task["torrent"]["name"],"is already downloaded.")
                     fn = item
                     folder_name = task["name"].replace(" ","_").replace(":","_").replace("?","_").replace("*","_").replace("?","_").replace(">","_").replace("<","_")+"_("+str(task["year"])+")"
