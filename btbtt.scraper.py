@@ -6,10 +6,13 @@ import json
 import os
 import sys
 import socket
-from datetime import datetime,date
+import requests
+import eventlet
+from datetime import datetime, date
 from bs4 import BeautifulSoup as bs
 from modules.db_handler import db_handler
 from config import list_pages, dburl
+from pprint import pprint
 
 # define static vars
 sleep_time = 3600*4
@@ -18,51 +21,56 @@ quit_scrap_num_in_db = 5
 mode_debug = True
 
 tmdb_api = "c746414134916b74f0666bd9f7704b44"
+#tmdb_url = "https://api.themoviedb.org/3/movie/"
+tmdb_url = "https://z4vrpkijmodhwsxzc.stoplight-proxy.io/3/movie/"
 db = db_handler(dburl)
-user_agent = 'Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)'
+user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
+headers = {'User-Agent': user_agent}
+eventlet.monkey_patch()
 
-
-def geturl(url, retry=5):
-    if retry==0:
+def geturl(url, retry=5, raw = False, decode = True):
+    if retry == 0:
         return False
-    socket.setdefaulttimeout(socket_timout)
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    from urllib.request import urlopen
-
+    content = False
     try:
-        content = urlopen(url, context=ctx).read()
-        return content
+        with eventlet.Timeout(10):
+            content = requests.get(url, verify=False, headers=headers)
+            if(raw):
+                return content.raw
+            else:
+                if(decode):
+                    return content.content.decode()
+                else:
+                    return content.content
     except:
         print("open and read error of url:", url, ". try again.")
-        return geturl(url,retry-1)
+        return geturl(url, retry-1)
 
 
 # do a look to search
 while True:
 
     # get the right host url from btbtt.com (btbtt.com always change the host address due to know reason)
-    btbtt_url = bs(geturl("http://www.btbtt.com/"), 'html.parser').find_all(
-        "form")[0].get("action")
-    if btbtt_url.find("http://") != -1:
-        btbtt_url = btbtt_url.replace("http://", "")
-    elif btbtt_url.find("https://") != -1:
-        btbtt_url = btbtt_url.replace("https://", "")
-    else:
-        print("get btbtt URL failed")
-        exit()
-    btbtt_url = "http://"+btbtt_url[:btbtt_url.find("/")+1]
+    #btbtt_url = bs(geturl("http://www.btbtt.com/"), 'html.parser').find_all("form")[0].get("action")
+    tmp_content = geturl("https://www.ddos4.com:3601/?u=http://www.btbtt.com/")
+    tmp_pos = tmp_content.find("var strU")
+    tmp_pos2 = tmp_content.find("baidu",tmp_content.find("var strU2"))
+    tmp_script = "function add(){ "+tmp_content[tmp_pos:tmp_pos2]+" return strU;}"
+    import execjs
+    ctx = execjs.compile(tmp_script)
+
+    btbtt_url = ctx.call("add")+"/"
+
     if mode_debug == True:
         print("btbtt.com url is :", btbtt_url)
 
     for list_page in list_pages: 
-        #this is a new page with a list of movie
+        # this is a new page with a list of movie
         print("scraping url:",btbtt_url+list_page["url"])
         list_html = bs(geturl(btbtt_url+list_page["url"]), 'html.parser')
         in_db_count = 0
         for list_content in list_html.select("table[tid][lastpost]"):
-            #this is a new movie in the list, need to scrap detailed information page for more info
+            # this is a new movie in the list, need to scrap detailed information page for more info
             list_content = bs(str(list_content), 'html.parser')
             btbtt_id = list_content.table["tid"]
             print("processing tid:", btbtt_id)
@@ -122,13 +130,13 @@ while True:
                         movie["imdb"] = imdb.group(0)
                         if mode_debug == True:
                             print("IMDB:", movie["imdb"])
-                        imdb_info = geturl("https://api.themoviedb.org/3/movie/" +
+                        imdb_info = geturl(tmdb_url +
                                            movie["imdb"]+"?language=en-US&api_key="+tmdb_api)
                         if imdb_info == False:
                             outflag = True
                             continue
 
-                        tmdb_rlt = json.loads(imdb_info.decode())
+                        tmdb_rlt = json.loads(imdb_info)
                         if "status_code" in tmdb_rlt and tmdb_rlt["status_code"]==34:
                             if list_page["filter"]["imdb"] == True:
                                 if mode_debug == True:
@@ -183,7 +191,7 @@ while True:
             file_url = btbtt_url+"attach-download-" + \
                 re.search(r'fid\-[0-9]+\-aid\-[0-9]+',
                           file_tmp_url).group(0)+".htm"
-            file_content = geturl(file_url)
+            file_content = geturl(file_url,decode = False)
             movie["torrent"] = {
                 "name": file_name,
                 "url": file_url,
