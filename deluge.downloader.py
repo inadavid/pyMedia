@@ -33,9 +33,10 @@ while True:
         if task["platform"] == "btbtt.com":
             fn = tdir+task["torrent"]["name"]
             print(fn)
-            f=open(fn,"wb")
-            f.write(task["torrent"]["content"])
-            f.close()
+            if(task["torrent"]["content"]!=False):
+                f=open(fn,"wb")
+                f.write(task["torrent"]["content"])
+                f.close()
         elif task["platform"] == "dytt8.net":
             print("implementing...")
         

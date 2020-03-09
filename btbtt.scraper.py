@@ -21,8 +21,8 @@ quit_scrap_num_in_db = 5
 mode_debug = True
 
 tmdb_api = "c746414134916b74f0666bd9f7704b44"
-#tmdb_url = "https://api.themoviedb.org/3/movie/"
-tmdb_url = "https://z4vrpkijmodhwsxzc.stoplight-proxy.io/3/movie/"
+tmdb_url = "https://api.themoviedb.org/3/movie/"
+#tmdb_url = "https://z4vrpkijmodhwsxzc.stoplight-proxy.io/3/movie/"
 db = db_handler(dburl)
 user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
 headers = {'User-Agent': user_agent}
